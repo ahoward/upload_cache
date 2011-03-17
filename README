@@ -1,0 +1,42 @@
+NAME
+  upload_cache.rb
+
+DESCRIPTION
+  a small utility library to facility caching http file uploads between
+  form validation failures.  designed for rails, but usable anywhere.
+
+USAGE
+  in the controller
+
+    def upload
+      @upload_cache = UploadCache.for(params, :upload)
+
+      @record = Model.new(params)
+
+      if request.get?
+        render and return
+      end
+
+      if request.post?
+        @record.save!
+        @upload_cache.clear!
+      end
+    end
+
+
+  in the view
+
+    <input type='file' name='upload />
+
+    <%= @upload_cache.hidden %>
+
+    <!-- optionally, you can show any uploaded upload -->
+
+    <% if url = @upload_cache.url %>
+      you already uploaded: <img src='<%= raw url %>' />
+    <% end %>
+
+
+  in a rake task
+
+    UploadCache.clear!  ### nuke old files once per day
