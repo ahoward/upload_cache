@@ -222,8 +222,10 @@ class UploadCache
   rescue
     nil
   ensure
-    @io.close
-    IOs.delete(object_id)
+    if @io
+      @io.close
+      IOs.delete(object_id)
+    end
     Thread.new{ UploadCache.clear! }
   end
 end
