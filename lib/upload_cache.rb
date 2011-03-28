@@ -3,7 +3,7 @@ require 'fileutils'
 require 'cgi'
 
 class UploadCache
-  Version = '1.0.0'
+  Version = '1.0.1'
 
   README = <<-__
     NAME
