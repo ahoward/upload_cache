@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '1.2.0'
+  Version = '1.2.1'
 
   Readme = <<-__
     NAME
@@ -315,18 +315,9 @@ end
 
 Upload_cache = UploadCache unless defined?(Upload_cache)
 
-
-
-if defined?(Rails.env)
-
+if defined?(Rails)
   if defined?(Rails.root) and Rails.root
     UploadCache.url = '/system/uploads/cache'
     UploadCache.root = File.join(Rails.root, 'public', UploadCache.url)
-  end
-
-  unless Rails.env.production?
-    if defined?(unloadable)
-      unloadable(UploadCache)
-    end
   end
 end
