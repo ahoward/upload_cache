@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '1.2.1'
+  Version = '1.3.0'
 
   Readme = <<-__
     NAME
@@ -277,12 +277,16 @@ class UploadCache
     end
   end
 
-  def hidden
-    raw("<input type='hidden' name='#{ @name }' value='#{ @value }' class='upload_cache' />") if @value
+  def to_s
+    url
   end
 
-  def to_s
-    hidden.to_s
+  def hidden
+    raw("<input type='hidden' name='#{ @name }' value='#{ @value }' class='upload_cache hidden' />") if @value
+  end
+
+  def input
+    raw("<input type='file' name='#{ @name }' class='upload_cache input' />")
   end
 
   module HtmlSafe
