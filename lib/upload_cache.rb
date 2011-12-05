@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '1.3.0'
+  Version = '1.4.0'
 
   Readme = <<-__
     NAME
@@ -62,7 +62,13 @@ class UploadCache
     end
 
     def url
-      @url ||= "file:/#{ root }"
+      @url ||= (
+        if defined?(Rails.root) and Rails.root
+          '/system/uploads/cache'
+        else
+          "file:/#{ root }"
+        end
+      )
     end
 
     def url=(url)
@@ -70,7 +76,13 @@ class UploadCache
     end
 
     def root
-      @root ||= Dir.tmpdir
+      @root ||= (
+        if defined?(Rails.root) and Rails.root
+          File.join(Rails.root, 'public', UploadCache.url)
+        else
+          Dir.tmpdir
+        end
+      )
     end
 
     def root=(root)
@@ -318,10 +330,3 @@ class UploadCache
 end
 
 Upload_cache = UploadCache unless defined?(Upload_cache)
-
-if defined?(Rails)
-  if defined?(Rails.root) and Rails.root
-    UploadCache.url = '/system/uploads/cache'
-    UploadCache.root = File.join(Rails.root, 'public', UploadCache.url)
-  end
-end
