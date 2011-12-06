@@ -1,0 +1,28 @@
+## upload_cache.gemspec
+#
+
+Gem::Specification::new do |spec|
+  spec.name = "upload_cache"
+  spec.version = "1.4.1"
+  spec.platform = Gem::Platform::RUBY
+  spec.summary = "upload_cache"
+  spec.description = "description: upload_cache kicks the ass"
+
+  spec.files =
+["README", "Rakefile", "lib", "lib/upload_cache.rb", "upload_cache.gemspec"]
+
+  spec.executables = []
+  
+  spec.require_path = "lib"
+
+  spec.test_files = nil
+
+  
+
+  spec.extensions.push(*[])
+
+  spec.rubyforge_project = "codeforpeople"
+  spec.author = "Ara T. Howard"
+  spec.email = "ara.t.howard@gmail.com"
+  spec.homepage = "https://github.com/ahoward/upload_cache"
+end
