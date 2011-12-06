@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '1.4.0'
+  Version = '1.4.1'
 
   Readme = <<-__
     NAME
@@ -64,7 +64,7 @@ class UploadCache
     def url
       @url ||= (
         if defined?(Rails.root) and Rails.root
-          '/system/uploads/cache'
+          '/system/upload_cache'
         else
           "file:/#{ root }"
         end
@@ -202,12 +202,20 @@ class UploadCache
       key = Array(options[:key] || args).flatten.compact
       key = [:upload] if key.empty?
 
+      return(
+        currently_uploaded_file(params, key, options) or
+        previously_uploaded_file(params, key, options) or
+        default_uploaded_file(params, key, options)
+      )
+    end
+
+    def currently_uploaded_file(params, key, options)
       upload = params.get(key)
 
       if upload.respond_to?(:read)
         tmpdir do |tmp|
           original_basename =
-            [:path, :filename, :original_path, :original_filename].
+            [:original_path, :original_filename, :path, :filename].
             map{|msg| upload.send(msg) if upload.respond_to?(msg)}.compact.first
           basename = cleanname(original_basename)
 
@@ -219,12 +227,16 @@ class UploadCache
         end
       end
 
+      false
+    end
+
+    def previously_uploaded_file(params, key, options)
       cache_key = cache_key_for(key)
       upload_cache = params.get(cache_key)
 
       if upload_cache
-        dirname, basename = File.split(upload_cache)
-        relative_dirname = File.expand_path(File.dirname(dirname))
+        dirname, basename = File.split(File.expand_path(upload_cache))
+        relative_dirname = File.basename(dirname)
         relative_basename = File.join(relative_dirname, basename)
         path = root + '/' + relative_basename
         upload_cache = UploadCache.new(key, path, options)
@@ -232,6 +244,10 @@ class UploadCache
         return upload_cache
       end
 
+      false
+    end
+
+    def default_uploaded_file(params, key, options)
       upload_cache = UploadCache.new(key, options)
       params.set(key, upload_cache.io) if upload_cache.io
       return upload_cache
