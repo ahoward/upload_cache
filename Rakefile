@@ -59,8 +59,13 @@ end
 
 task :gemspec do
   ignore_extensions = ['git', 'svn', 'tmp', /sw./, 'bak', 'gem']
-  ignore_directories = ['pkg']
+  ignore_directories = ['pkg', 'test/tmp', 'tmp']
   ignore_files = ['test/log', 'a.rb'] + Dir['db/*'] + %w'db'
+
+  root = File.expand_path(File.dirname(__FILE__))
+
+  ignore_directories.map!{|_| File.join(root, _)}
+  ignore_files.map!{|_| File.join(root, _)}
 
   shiteless = 
     lambda do |list|
@@ -70,14 +75,13 @@ task :gemspec do
         ignore_extensions.any?{|ext| ext === extension}
       end
       list.delete_if do |entry|
-        next unless test(?d, entry)
-        dirname = File.expand_path(entry)
-        ignore_directories.any?{|dir| File.expand_path(dir) == dirname}
-      end
-      list.delete_if do |entry|
         next unless test(?f, entry)
         filename = File.expand_path(entry)
         ignore_files.any?{|file| File.expand_path(file) == filename}
+      end
+      list.delete_if do |entry|
+        dirname = File.expand_path(entry)
+        ignore_directories.any?{|dir| dirname[dir]}
       end
     end
 

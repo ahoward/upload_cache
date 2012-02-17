@@ -79,11 +79,13 @@ Testing UploadCache do
 
 
   TestDir                 = File.expand_path(File.dirname(__FILE__))
-  Public                  = File.join(TestDir, 'public')
-  PublicSystem            = File.join(TestDir, 'public/system')
-  PublicSystemUploadCache = File.join(TestDir, 'public/system/upload_cache')
-  PublicSystemUploads     = File.join(TestDir, 'public/system/uploads')
+  TestTmpDir              = File.join(TestDir,    'tmp')
+  Public                  = File.join(TestTmpDir, 'public')
+  PublicSystem            = File.join(TestTmpDir, 'public/system')
+  PublicSystemUploadCache = File.join(TestTmpDir, 'public/system/upload_cache')
+  PublicSystemUploads     = File.join(TestTmpDir, 'public/system/uploads')
 
+  FileUtils.mkdir_p(TestTmpDir)
   FileUtils.mkdir_p(Public)
   FileUtils.mkdir_p(PublicSystem)
   FileUtils.mkdir_p(PublicSystemUploadCache)
@@ -94,9 +96,9 @@ Testing UploadCache do
   end
 
   at_exit do
-    glob = File.join(PublicSystemUploads, '**/**')
+    glob = File.join(TestTmpDir, '**/**')
     Dir.glob(glob) do |entry|
-      FileUtils.rm_rf(entry)
+      #FileUtils.rm_rf(entry)
     end
   end
 
