@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '1.4.1'
+  Version = '2.0.0'
 
   Readme = <<-__
     NAME
@@ -60,6 +60,7 @@ class UploadCache
     def version
       UploadCache::Version
     end
+
 
     def url
       @url ||= (
@@ -128,7 +129,7 @@ class UploadCache
 
     def finalizer(object_id)
       if fd = IOs[object_id]
-        IO.for_fd(fd).close
+        ::IO.for_fd(fd).close rescue nil
         IOs.delete(object_id)
       end
     end
@@ -187,69 +188,122 @@ class UploadCache
       @prefix
     end
 
-    def prefix=(value)
-      @prefix = value
-    end
-
     def default
       @default ||= Map[:url, nil, :path, nil]
     end
 
-    def for(params, *args)
-      params = Map.for(params)
+    def prefix=(value)
+      @prefix = value
+    end
+
+    def cache(params, *args)
+      params_map = Map.for(params)
       options = Map.options_for!(args)
 
       key = Array(options[:key] || args).flatten.compact
       key = [:upload] if key.empty?
 
-      return(
-        currently_uploaded_file(params, key, options) or
-        previously_uploaded_file(params, key, options) or
-        default_uploaded_file(params, key, options)
+      upload_cache = (
+        current_upload_cache_for(params_map, key, options) or
+        previous_upload_cache_for(params_map, key, options) or
+        default_upload_cache_for(params_map, key, options)
       )
+
+      value = params_map.get(key)
+
+      update_params(params, key, value)
+
+      upload_cache
+    end
+    alias_method('for', 'cache')
+
+    def update_params(params, key, value)
+      key = Array(key).flatten
+
+      leaf = key.pop
+      path = key
+      node = params
+
+      until path.empty?
+        key = path.shift
+        case node
+          when Array
+            index = Integer(key)
+            break unless node[index]
+            node = node[index]
+          else
+            break unless node.has_key?(key)
+            node = node[key]
+        end
+      end
+
+      node[leaf] = value
     end
 
-    def currently_uploaded_file(params, key, options)
+    def current_upload_cache_for(params, key, options)
       upload = params.get(key)
+      if upload.respond_to?(:upload_cache) and upload.upload_cache
+        return upload.upload_cache
+      end
 
       if upload.respond_to?(:read)
         tmpdir do |tmp|
           original_basename =
             [:original_path, :original_filename, :path, :filename].
-            map{|msg| upload.send(msg) if upload.respond_to?(msg)}.compact.first
+              map{|msg| upload.send(msg) if upload.respond_to?(msg)}.compact.first
+
           basename = cleanname(original_basename)
 
           path = File.join(tmp, basename)
-          open(path, 'wb'){|fd| fd.write(upload.read)}
+
+          FileUtils.rm_f(path)
+
+          begin
+            FileUtils.ln(upload.path, path)
+          rescue
+            open(path, 'wb'){|fd| fd.write(upload.read)}
+          end
+
+          begin
+            upload.rewind
+          rescue Object
+            nil
+          end
+
           upload_cache = UploadCache.new(key, path, options)
           params.set(key, upload_cache.io)
           return upload_cache
         end
       end
 
-      false
+      nil
     end
 
-    def previously_uploaded_file(params, key, options)
-      cache_key = cache_key_for(key)
-      upload_cache = params.get(cache_key)
+    def previous_upload_cache_for(params, key, options)
+      upload = params.get(key)
+      if upload.respond_to?(:upload_cache) and upload.upload_cache
+        return upload.upload_cache
+      end
 
-      if upload_cache
-        dirname, basename = File.split(File.expand_path(upload_cache))
+      upload = params.get(cache_key_for(key))
+
+      if upload
+        dirname, basename = File.split(File.expand_path(upload))
         relative_dirname = File.basename(dirname)
         relative_basename = File.join(relative_dirname, basename)
         path = root + '/' + relative_basename
+
         upload_cache = UploadCache.new(key, path, options)
         params.set(key, upload_cache.io)
         return upload_cache
       end
 
-      false
+      nil
     end
 
-    def default_uploaded_file(params, key, options)
+    def default_upload_cache_for(params, key, options)
       upload_cache = UploadCache.new(key, options)
-      params.set(key, upload_cache.io) if upload_cache.io
+      params.set(key, upload_cache.io)
       return upload_cache
     end
   end
@@ -294,7 +348,38 @@ class UploadCache
       @io = open(@path || @default_path, 'rb')
       IOs[object_id] = @io.fileno
       ObjectSpace.define_finalizer(self, UploadCache.method(:finalizer).to_proc)
+      @io.send(:extend, WeakReference)
+      @io.upload_cache = self
     end
+  end
+
+  module WeakReference
+    attr_accessor :upload_cache_object_id
+
+    def upload_cache
+      begin
+        ObjectSpace._id2ref(upload_cache_object_id)
+      rescue Object
+        nil
+      end
+    end
+
+    def upload_cache=(upload_cache)
+      self.upload_cache_object_id = upload_cache.object_id
+    end
+  end
+
+  def inspect
+    {
+      UploadCache.name =>
+        {
+          :key => key, :cache_key => key, :name => name, :path => path, :io => io
+        }
+    }.inspect
+  end
+
+  def blank?
+    @path.blank?
   end
 
   def url
@@ -302,6 +387,7 @@ class UploadCache
       File.join(UploadCache.url, @value)
     else
       @default_url ? @default_url : nil
+      #defined?(@placeholder) ? @placeholder : nil
     end
   end
 
@@ -343,6 +429,7 @@ class UploadCache
       Thread.new{ UploadCache.clear! }
     end
   end
+  alias_method('clear', 'clear!')
 end
 
 Upload_cache = UploadCache unless defined?(Upload_cache)
