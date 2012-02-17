@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '2.0.0'
+  Version = '2.1.0'
 
   Readme = <<-__
     NAME
@@ -310,6 +310,7 @@ class UploadCache
 
   attr_accessor :key
   attr_accessor :cache_key
+  attr_accessor :options
   attr_accessor :name
   attr_accessor :path
   attr_accessor :dirname
@@ -322,18 +323,18 @@ class UploadCache
   IOs = {}
 
   def initialize(key, *args)
-    options = Map.options_for!(args)
+    @options = Map.options_for!(args)
 
     @key = key
     @cache_key = UploadCache.cache_key_for(@key)
     @name = UploadCache.name_for(@cache_key)
 
-    path = args.shift || options[:path]
+    path = args.shift || @options[:path]
 
-    default = Map.for(options[:default])
+    default = Map.for(@options[:default])
 
-    @default_url = default[:url] || options[:default_url] || UploadCache.default.url
-    @default_path = default[:path] || options[:default_path] || UploadCache.default.path
+    @default_url = default[:url] || @options[:default_url] || UploadCache.default.url
+    @default_path = default[:path] || @options[:default_path] || UploadCache.default.path
 
     if path
       @path = path
@@ -416,18 +417,22 @@ class UploadCache
     string.html_safe
   end
 
-  def clear!
-    return if UploadCache.turd?
+  def clear!(&block)
+    result = block ? block.call(@path) : nil 
 
-    begin
-      FileUtils.rm_rf(@dirname) if test(?d, @dirname)
-    rescue
-      nil
-    ensure
-      @io.close rescue nil
-      IOs.delete(object_id)
-      Thread.new{ UploadCache.clear! }
+    unless UploadCache.turd?
+      begin
+        FileUtils.rm_rf(@dirname) if test(?d, @dirname)
+      rescue
+        nil
+      ensure
+        @io.close rescue nil
+        IOs.delete(object_id)
+        Thread.new{ UploadCache.clear! }
+      end
     end
+
+    result
   end
   alias_method('clear', 'clear!')
 end
