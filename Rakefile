@@ -29,7 +29,8 @@ def run_tests!(which = nil)
 
   test_rbs.each_with_index do |test_rb, index|
     testno = index + 1
-    command = "#{ This.ruby } -I ./lib -I ./test/lib #{ test_rb }"
+    test_rb.gsub!(/#{ Regexp.escape(This.dir) }/, '.')
+    command = "#{ File.basename(This.ruby) } -I./lib -I./test/lib #{ test_rb }"
 
     puts
     say(div, :color => :cyan, :bold => true)
