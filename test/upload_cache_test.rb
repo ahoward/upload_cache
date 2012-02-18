@@ -23,7 +23,7 @@ Testing UploadCache do
 
     assert{ upload_cache.io }
     assert{ upload_cache.path }
-    assert{ uploaded_file.read == upload_cache.io.read }
+    assert{ IO.read(uploaded_file.path) == IO.read(upload_cache.io.path) }
   end
 
 ##
@@ -77,6 +77,30 @@ Testing UploadCache do
     assert{ b.object_id != c.object_id }
   end
 
+##
+#
+  testing 'upload_cache works on file handles that need flushing' do
+    uploaded_file = new_uploaded_file
+
+    params = {
+      :key => uploaded_file
+    }
+
+    uploaded_file.rewind
+    uploaded_file.sync = false
+    uploaded_file.write('a half baked write')
+
+    upload_cache = assert{ UploadCache.cache(params, :key) }
+
+    assert{ params[:key] }
+    assert{ params[:key].respond_to?(:upload_cache_object_id) }
+    assert{ params[:key].respond_to?(:upload_cache) }
+
+    assert{ upload_cache.io }
+    assert{ upload_cache.path }
+    assert{ IO.read(uploaded_file.path) == IO.read(upload_cache.io.path) }
+  end
+
 
   TestDir                 = File.expand_path(File.dirname(__FILE__))
   TestTmpDir              = File.join(TestDir,    'tmp')
@@ -108,6 +132,8 @@ Testing UploadCache do
     at_exit{ FileUtils.rm_f(path) }
     fd = open(path, 'w+')
     fd.puts(Count)
+    #fd.flush
+    #fd.rewind
     return fd unless block
     begin
       block.call(fd)

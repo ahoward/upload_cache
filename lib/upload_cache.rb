@@ -5,7 +5,7 @@ require 'tmpdir'
 require 'map'
 
 class UploadCache
-  Version = '2.1.0'
+  Version = '2.2.0'
 
   Readme = <<-__
     NAME
@@ -256,19 +256,30 @@ class UploadCache
 
           path = File.join(tmp, basename)
 
-          FileUtils.rm_f(path)
+          copied = false
 
-          begin
-            FileUtils.ln(upload.path, path)
-          rescue
-            open(path, 'wb'){|fd| fd.write(upload.read)}
+          rewind(upload) do
+            src = upload.path
+            dst = path
+
+            strategies = [
+              proc{ `ln -f #{ src.inspect } #{ dst.inspect } || cp -f #{ src.inspect } #{ dst.inspect }`},
+              proc{ FileUtils.ln(src, dst) },
+              proc{ FileUtils.cp(src, dst) },
+              proc{ 
+                open(dst, 'wb'){|fd| fd.write(upload.read)} 
+              }
+            ]
+
+            FileUtils.rm_f(dst)
+
+            strategies.each do |strategy|
+              strategy.call rescue nil
+              break if((copied = test(?e, dst)))
+            end
           end
 
-          begin
-            upload.rewind
-          rescue Object
-            nil
-          end
+          raise("failed to copy #{ upload.path.inspect } -> #{ path.inspect }") unless copied
 
           upload_cache = UploadCache.new(key, path, options)
           params.set(key, upload_cache.io)
@@ -305,6 +316,26 @@ class UploadCache
       upload_cache = UploadCache.new(key, options)
       params.set(key, upload_cache.io)
       return upload_cache
+    end
+
+    def rewind(io, &block)
+      begin
+        pos = io.pos
+        io.flush
+        io.rewind
+      rescue
+        nil
+      end
+
+      begin
+        block.call
+      ensure
+        begin
+          io.pos = pos
+        rescue
+          nil
+        end
+      end
     end
   end
 
